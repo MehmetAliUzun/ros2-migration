@@ -30,3 +30,21 @@
 *.exe
 *.out
 *.app
+
+# ROS2 workspace build artifacts
+/build/
+/install/
+/log/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Editor/IDE settings
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
