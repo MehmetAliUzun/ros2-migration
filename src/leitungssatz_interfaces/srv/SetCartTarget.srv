@@ -1,0 +1,18 @@
+# Modes
+# 1: moveL
+# 2: moveJ_IK
+int64 mode
+
+# cartesian goal in meter and quaternion
+geometry_msgs/Transform cartesian_goal
+
+# tool speed [m/s]
+float64  speed
+
+# tool acceleration [m/s^2] 
+float64  acceleration
+
+# A bool specifying if the move command should be asynchronous.
+bool asynchronous
+---
+bool success

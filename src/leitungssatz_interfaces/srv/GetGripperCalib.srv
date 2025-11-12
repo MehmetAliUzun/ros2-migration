@@ -1,0 +1,15 @@
+---
+# max min and current values of gripper in mm
+float64 mm_max
+float64 mm_current
+float64 mm_min
+
+# max min and current values of gripper in % [0-100]
+float64 per_max
+float64 per_current
+float64 per_min
+
+# max min and current values of gripper in device [0-255]
+float64 dev_max
+float64 dev_current
+float64 dev_min

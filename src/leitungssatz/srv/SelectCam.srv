@@ -1,0 +1,7 @@
+string camera_type   # Type of camera, options are: "IDS", "FLIR", "USB"
+uint32 camera_index  # Index of the camera if there are several of the same manufacturer connected
+---
+VectorResolution available_resolutions # All the resolutions that the camera support
+uint32 resolution_idx # The index of availableResolutions that holds the current resolution of the camera (zero based indexing)
+bool success   # indicate successful run of camera selection
+string message # informational, e.g. for error messages

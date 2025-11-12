@@ -1,0 +1,13 @@
+# Service is handled by CableOrienter ROS 2
+# learning:       True = learning mode -> save point
+#                 False = operating mode -> use saved point 
+# cableNumber:    0 = calibration with blue cable # deprecated
+#                 1 = black cable
+#                 2 = lower blue 
+#                 3 = upper blue cable
+
+
+bool learning
+int8 cable_number
+---
+bool success

@@ -1,0 +1,9 @@
+# tool speed [m/s] (spatial vector) 
+float64[6] xd
+# List of six floats. 
+# The first three elements are interpreted as a 3D vector (in the robot base coordinate system) giving the direction in which contacts should be detected. If all elements of the list are zero, contacts from all directions are considered. You can also set direction=get_target_tcp_speed() in which case it will detect contacts in the direction of the TCP movement. 
+float64[6] direction
+# tool position acceleration [m/s^2] 
+float64 acceleration
+---
+bool success

@@ -1,0 +1,13 @@
+# joint positions 
+float64[6] joint_goal
+
+# joint speed of leading axis [rad/s] 
+float64  speed
+
+# joint acceleration of leading axis [rad/s^2] 
+float64  acceleration
+
+# A bool specifying if the move command should be asynchronous.
+bool asynchronous
+---
+bool success

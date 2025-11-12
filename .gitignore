@@ -1,0 +1,22 @@
+# Colcon / ROS2 build artifacts
+/build/
+/install/
+/log/
+/*.log
+
+# Python/IDE/etc
+__pycache__/
+*.pyc
+*.pyo
+*.swp
+.vscode/
+.idea/
+*.egg-info/
+
+# system
+.DS_Store
+*.tar.gz
+
+# optional caches
+.colcon/
+pytest_cache/

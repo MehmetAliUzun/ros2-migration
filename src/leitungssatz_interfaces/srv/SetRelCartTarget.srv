@@ -1,0 +1,18 @@
+# Modes
+# 1: moveL
+# 2: moveJ_IK
+int64 mode
+
+# relative cartesian goal in meter roll pitch yaw
+float64[6] rel_goal
+
+# tool speed [m/s]
+float64  speed
+
+# tool acceleration [m/s^2] 
+float64  acceleration
+
+# A bool specifying if the move command should be asynchronous.
+bool asynchronous
+---
+bool success

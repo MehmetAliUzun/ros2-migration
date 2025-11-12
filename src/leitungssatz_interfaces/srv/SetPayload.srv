@@ -1,0 +1,7 @@
+# Mass in kilograms 
+float64 mass
+
+# Center of Gravity, a vector [CoGx, CoGy, CoGz] specifying the displacement (in meters) from the toolmount.
+float64[3] cog 
+---
+bool success

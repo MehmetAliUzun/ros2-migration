@@ -1,0 +1,5 @@
+# Set the speed slider on the teach pendant
+# Only Values between 0 and 1 are prozessed
+float64 slider
+---
+bool success

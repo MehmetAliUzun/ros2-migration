@@ -1,0 +1,26 @@
+# Input
+# 0 - end forcemode
+# 1 - start forcemode
+bool io
+
+# A Transfrom that defines the force frame relative to the base frame. 
+geometry_msgs/Transform frame
+
+# A 6d vector of 0s and 1s. 
+# 1 means that the robot will be compliant in the corresponding axis of the task frame 
+int64[6] selection_vector
+
+# The forces/torques the robot will apply to its environment in N.
+float64[6] wrench
+
+# An integer [1;3] specifying how the robot interprets the force frame.
+# 1 - The force frame is transformed in a way such that its y-axis is aligned with a vector pointing from the robot tcp towards the origin of the force frame. 
+# 2 - The force frame is not transformed. 
+# 3 - The force frame is transformed in a way such that its x-axis is the projection of the robot tcp velocity vector onto the x-y plane of the force frame. 
+int64 type
+
+# For compliant axes, these values are the maximum allowed tcp speed along/about the axis.
+# or non-compliant axes, these values are the maximum allowed deviation along/about an axis between the actual tcp position and the one set by the program. 
+float64[6] limits
+---
+bool success

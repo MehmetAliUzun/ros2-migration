@@ -1,0 +1,5 @@
+<library path="libur_hardware_interface">
+  <class name="leitungssatz_ros2_driver/URHardwareInterface"
+         type="leitungssatz_ros2_driver::URHardwareInterface"
+         base_class_type="hardware_interface::SystemInterface"/>
+</library>

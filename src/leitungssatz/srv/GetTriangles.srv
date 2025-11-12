@@ -1,0 +1,8 @@
+#status
+# -1 - failure
+# 1 - is running
+# 2 - finished
+
+---
+float64 delta
+int8 status

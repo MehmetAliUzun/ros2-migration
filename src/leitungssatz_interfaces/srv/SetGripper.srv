@@ -1,0 +1,25 @@
+#position_unit
+#0: %           [0-100]
+#1: mm  
+#2: device      [0-255]
+int64 position_unit
+
+# Gripper goal position
+float64 position
+
+# Speed to move at [0-100%] 
+float64 speed
+
+# Force to use [0-100%] 
+float64 force
+
+# A bool specifying if the move command should be asynchronous.
+bool asynchronous
+---
+# Object status reported by the gripper. [0-3]
+# 0 - MOVING
+# 1 - STOPPED_OUTER_OBJECT
+# 2 - STOPPED_INNER_OBJECT
+# 3 - AT_DEST
+int64 e_object_status
+bool success

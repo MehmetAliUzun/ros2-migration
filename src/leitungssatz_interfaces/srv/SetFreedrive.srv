@@ -1,0 +1,28 @@
+# Input
+# 0 - end freedrive
+# 1 - start freedrive
+bool io
+
+# A vector that contains 0’s and 1’s, these indicates in which axes movement is allowed.
+# x,y,z,rx,ry,rz
+# 0 - lock axis
+# 1 - unlock axis
+int64[6] free_axes
+
+# defines a freedrive frame relative to the base frame
+# 0 - base
+# 1 - tcp
+# 2 - custom frame
+int8 feature
+
+# A Transfrom that defines the free axis relative to the base frame.
+geometry_msgs/Transform custom_frame
+
+---
+# Returns status of freedrive mode for current robot pose. 
+# 0 - Normal operation.
+# 1 - Near singularity.
+# 2 - Too close to singularity. High movement resistance in freedrive. 
+int64 freedrive_status
+bool success
+string message

@@ -1,0 +1,12 @@
+# Input
+# 0 - end log
+# 1 - start log
+bool io
+
+# Log file name 
+string file_name
+
+# Parameter to log
+string[] parameter
+---
+bool success

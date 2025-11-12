@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>leitungssatz_interfaces</name>
+  <version>0.1.0</version>
+  <description>Shared message and service definitions for the leitungssatz project</description>
+  <maintainer email="mehmet.uzun@study.thws.de">Mehmet Uzun</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+
+  <build_depend>std_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>builtin_interfaces</build_depend>
+
+  <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <!-- Required for a package that installs interfaces -->
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

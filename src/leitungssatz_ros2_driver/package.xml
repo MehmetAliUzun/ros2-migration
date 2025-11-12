@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>leitungssatz_ros2_driver</name>
+  <version>0.1.0</version>
+  <description>UR5e RTDE hardware driver and custom interfaces (ros2/humble)</description>
+  <maintainer email="you@example.com">you</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Build / runtime dependencies -->
+  <build_depend>rclcpp</build_depend>
+  <build_depend>rclcpp_lifecycle</build_depend>
+  <build_depend>hardware_interface</build_depend>
+  <build_depend>controller_manager</build_depend>
+  <build_depend>realtime_tools</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>builtin_interfaces</build_depend>
+  <build_depend>ament_index_cpp</build_depend>
+  
+ 
+  <build_depend>leitungssatz_interfaces</build_depend>
+  <exec_depend>leitungssatz_interfaces</exec_depend>
+
+  <build_depend>leitungssatzS</build_depend>
+  <exec_depend>leitungssatz</exec_depend>
+
+  <build_depend>pluginlib</build_depend>
+  <exec_depend>pluginlib</exec_depend>
+  <build_depend>tf2</build_depend>
+  <exec_depend>tf2</exec_depend>
+  <build_depend>tf2_eigen</build_depend>
+  <exec_depend>tf2_eigen</exec_depend>
+  <build_depend>eigen3_cmake_module</build_depend>
+  <exec_depend>eigen3_cmake_module</exec_depend>
+
+  <!-- Optional UR RTDE C++ binding -->
+  <build_depend>ur_rtde</build_depend>
+  <exec_depend>ur_rtde</exec_depend>
+
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>rclcpp_lifecycle</exec_depend>
+  <exec_depend>hardware_interface</exec_depend>
+
+  <!-- rosidl -->
+  <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
