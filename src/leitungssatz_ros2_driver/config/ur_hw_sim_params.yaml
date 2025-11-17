@@ -1,0 +1,6 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100
+    hardware:
+      ur_hw_sim:
+        plugin: "leitungssatz_interfaces/URHardwareInterfaceSim"

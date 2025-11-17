@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<robot name="table" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <link name="table_link">
+    <visual>
+      <geometry>
+        <box size="2 1.5 0.05"/>
+      </geometry>
+      <material name="white">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="2 1.5 0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <xacro:property name="table_height" value="0.75"/>
+
+  <joint name="world_to_table" type="fixed">
+    <parent link="world"/>
+    <child link="table_link"/>
+    <origin xyz="0 0 ${table_height}" rpy="0 0 0"/>
+  </joint>
+
+</robot>

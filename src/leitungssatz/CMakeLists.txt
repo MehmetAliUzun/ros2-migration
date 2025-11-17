@@ -278,7 +278,7 @@ install(TARGETS
   touch_detection_service
   touch_detection_node
   simple_image_publisher
-  DESTINATION lib
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 # Install header files

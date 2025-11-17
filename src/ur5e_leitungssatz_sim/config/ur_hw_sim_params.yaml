@@ -1,0 +1,8 @@
+ros2_control:
+  ros__parameters:
+    update_rate: 100
+    hardware:
+      plugin: "leitungssatz_interfaces/URHardwareInterfaceSim"
+      ros__parameters:
+        # sim plugin doesn't need robot_ip, but you can add it if you want
+        robot_ip: "127.0.0.1"

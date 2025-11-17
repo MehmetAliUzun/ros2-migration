@@ -1,5 +1,18 @@
-<library path="libur_hardware_interface">
-  <class name="leitungssatz_ros2_driver/URHardwareInterface"
-         type="leitungssatz_ros2_driver::URHardwareInterface"
-         base_class_type="hardware_interface::SystemInterface"/>
+cat > ~/Desktop/ls_ros2/src/leitungssatz_ros2_driver/resources/hardware_interface_plugin.xml <<'XML'
+<?xml version="1.0"?>
+<library path="lib/libur_hardware_interface.so">
+  <!-- Real robot hardware plugin -->
+  <class name="leitungssatz_interfaces/URHardwareInterface"
+         type="leitungssatz_interfaces::URHardwareInterface">
+    <description>UR real RTDE hardware interface</description>
+  </class>
 </library>
+
+<!-- Sim hardware plugin library -->
+<library path="lib/libur_hardware_interface_sim.so">
+  <class name="leitungssatz_interfaces/URHardwareInterfaceSim"
+         type="leitungssatz_interfaces::URHardwareInterfaceSim">
+    <description>UR simulation adapter (for Gazebo)</description>
+  </class>
+</library>
+XML

@@ -26,6 +26,9 @@ URHardwareInterface::~URHardwareInterface()
   rtde_thread_running_ = false;
   if (rtde_thread_.joinable()) rtde_thread_.join();
   disconnect_from_robot();
+
+  if (dashboard_) dashboard_->shutdown();
+  if (gripper_) gripper_->shutdown();
 }
 
 CallbackReturn URHardwareInterface::on_init(const hardware_interface::HardwareInfo & info)
@@ -58,6 +61,8 @@ CallbackReturn URHardwareInterface::on_init(const hardware_interface::HardwareIn
   robot_ip_ = "172.31.1.200";
   for (auto & p : info_.hardware_parameters) {
     if (p.first == "robot_ip") robot_ip_ = p.second;
+    if (p.first == "use_dashboard") use_dashboard_ = (p.second == "true" || p.second == "1");
+    if (p.first == "use_robotiq") use_robotiq_ = (p.second == "true" || p.second == "1");
   }
 
   RCUTILS_LOG_INFO_NAMED("URHardwareInterface", "on_init successful; robot_ip=%s", robot_ip_.c_str());
@@ -115,10 +120,58 @@ CallbackReturn URHardwareInterface::on_configure(const rclcpp_lifecycle::State &
   srv_add_tf2_ = node_->create_service<leitungssatz::srv::AddTf2>("/store_tf",
     std::bind(&URHardwareInterface::handle_add_tf2, this, std::placeholders::_1, std::placeholders::_2));
 
+  // Newly added service servers (restore ROS1 parity)
+  srv_set_rel_cart_target_ = node_->create_service<leitungssatz_interfaces::srv::SetRelCartTarget>("/ur_hardware_interface/set_rel_cart_target",
+    std::bind(&URHardwareInterface::handle_set_rel_cart_target, this, std::placeholders::_1, std::placeholders::_2));
+  srv_set_joint_target_ = node_->create_service<leitungssatz_interfaces::srv::SetJointTarget>("/ur_hardware_interface/set_joint_target",
+    std::bind(&URHardwareInterface::handle_set_joint_target, this, std::placeholders::_1, std::placeholders::_2));
+  srv_set_rel_joint_target_ = node_->create_service<leitungssatz_interfaces::srv::SetJointTarget>("/ur_hardware_interface/set_rel_joint_target",
+    std::bind(&URHardwareInterface::handle_set_rel_joint_target, this, std::placeholders::_1, std::placeholders::_2));
+  srv_set_trajectory_ = node_->create_service<leitungssatz_interfaces::srv::SetTrajectory>("/ur_hardware_interface/set_trajectory",
+    std::bind(&URHardwareInterface::handle_set_trajectory, this, std::placeholders::_1, std::placeholders::_2));
+  srv_set_contact_target_ = node_->create_service<leitungssatz_interfaces::srv::SetContactTarget>("/ur_hardware_interface/set_contact_target",
+    std::bind(&URHardwareInterface::handle_set_contact_target, this, std::placeholders::_1, std::placeholders::_2));
+  srv_log_ = node_->create_service<leitungssatz_interfaces::srv::Log>("/ur_hardware_interface/logging",
+    std::bind(&URHardwareInterface::handle_log, this, std::placeholders::_1, std::placeholders::_2));
+  srv_get_timestamp_ = node_->create_service<leitungssatz_interfaces::srv::GetTimeStamp>("/ur_hardware_interface/get_robot_timestamp",
+    std::bind(&URHardwareInterface::handle_get_timestamp, this, std::placeholders::_1, std::placeholders::_2));
+  srv_set_payload_ = node_->create_service<leitungssatz_interfaces::srv::SetPayload>("/ur_hardware_interface/set_payload",
+    std::bind(&URHardwareInterface::handle_set_payload, this, std::placeholders::_1, std::placeholders::_2));
+  srv_stop_motion_ = node_->create_service<leitungssatz_interfaces::srv::StopMotion>("/ur_hardware_interface/stop_motion",
+    std::bind(&URHardwareInterface::handle_stop_motion, this, std::placeholders::_1, std::placeholders::_2));
+  srv_set_clip_gun_ = node_->create_service<leitungssatz_interfaces::srv::SetClipGun>("/ur_hardware_interface/set_clip_gun",
+    std::bind(&URHardwareInterface::handle_set_clip_gun, this, std::placeholders::_1, std::placeholders::_2));
+  srv_zero_ftsensor_ = node_->create_service<std_srvs::srv::Trigger>("/ur_hardware_interface/zero_ftsensor",
+    std::bind(&URHardwareInterface::handle_zero_ftsensor, this, std::placeholders::_1, std::placeholders::_2));
+
   // Connect to robot (instantiate RTDE objects)
   if (!connect_to_robot()) {
     RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "Failed to connect to robot");
     return CallbackReturn::ERROR;
+  }
+
+  // initialize optional helpers
+  if (use_dashboard_) {
+    dashboard_ = std::make_unique<DashboardClient>();
+    if (!dashboard_->init(node_, robot_ip_)) {
+      RCUTILS_LOG_WARN_NAMED("URHardwareInterface", "Dashboard init failed (continuing without dashboard)");
+      dashboard_.reset();
+    } else {
+      // wait until robot is in remote control (like ROS1)
+      size_t attempts = 0;
+      while (rclcpp::ok() && dashboard_->isInRemoteControl() == false && attempts++ < 20) {
+        RCUTILS_LOG_WARN_NAMED("URHardwareInterface", "Please set Robot to remote control (dashboard)");
+        std::this_thread::sleep_for(500ms);
+      }
+    }
+  }
+
+  if (use_robotiq_) {
+    gripper_ = std::make_unique<RobotiqGripperInterface>();
+    if (!gripper_->init(node_, robot_ip_)) {
+      RCUTILS_LOG_WARN_NAMED("URHardwareInterface", "Robotiq init failed (continuing without gripper)");
+      gripper_.reset();
+    }
   }
 
   // start RTDE thread
@@ -192,11 +245,9 @@ void URHardwareInterface::disconnect_from_robot()
   // stop RTDE thread (already signalled by destructor)
   try {
     if (rtde_control_) {
-      // rtde_control_->disconnect(); // if API supports
       rtde_control_.reset();
     }
     if (rtde_receive_) {
-      // rtde_receive_->disconnect(); // if API supports
       rtde_receive_.reset();
     }
   } catch (...) {}
@@ -321,6 +372,7 @@ void URHardwareInterface::rtde_thread_loop()
 
 // ------------------ Service handlers (non-realtime) ------------------
 
+// Freedrive handler (existing)
 void URHardwareInterface::handle_set_freedrive(
   const std::shared_ptr<leitungssatz_interfaces::srv::SetFreedrive::Request> request,
   std::shared_ptr<leitungssatz_interfaces::srv::SetFreedrive::Response> response)
@@ -329,6 +381,8 @@ void URHardwareInterface::handle_set_freedrive(
   try {
     if (!rtde_control_ || !rtde_control_->isConnected()) {
       response->success = false;
+      response->freedrive_status = 0;
+      response->message = "not connected";
       return;
     }
 
@@ -366,13 +420,16 @@ void URHardwareInterface::handle_set_freedrive(
     } else {
       response->freedrive_status = 0;
     }
+    response->message = "";
   } catch (const std::exception & e) {
     RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "set_freedrive exception: %s", e.what());
     response->success = false;
     response->freedrive_status = 0;
+    response->message = e.what();
   }
 }
 
+// set_cart_target (existing)
 void URHardwareInterface::handle_set_cart_target(
   const std::shared_ptr<leitungssatz_interfaces::srv::SetCartTarget::Request> request,
   std::shared_ptr<leitungssatz_interfaces::srv::SetCartTarget::Response> response)
@@ -408,13 +465,19 @@ void URHardwareInterface::handle_set_cart_target(
         break;
     }
 
-    response->success = success;
+    // keep ROS1 asynchronous semantics: accept async requests as success if accepted
+    if (request->asynchronous) {
+      response->success = true;
+    } else {
+      response->success = success;
+    }
   } catch (const std::exception & e) {
     RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "set_cart_target exception: %s", e.what());
     response->success = false;
   }
 }
 
+// start_jog (existing)
 void URHardwareInterface::handle_start_jog(
   const std::shared_ptr<leitungssatz_interfaces::srv::StartJog::Request> request,
   std::shared_ptr<leitungssatz_interfaces::srv::StartJog::Response> response)
@@ -449,6 +512,7 @@ void URHardwareInterface::handle_start_jog(
   }
 }
 
+// set_force_target (existing)
 void URHardwareInterface::handle_set_force_target(
   const std::shared_ptr<leitungssatz_interfaces::srv::SetForceTarget::Request> request,
   std::shared_ptr<leitungssatz_interfaces::srv::SetForceTarget::Response> response)
@@ -461,10 +525,8 @@ void URHardwareInterface::handle_set_force_target(
     }
 
     if (request->io) {
-      // start force mode
       std::vector<double> task_frame;
-      // if frame rotation is not identity, use it
-      geometry_msgs::msg::Quaternion tmp;
+      geometry_msgs::msg::Quaternion tmp{};
       if (request->frame.rotation.x != tmp.x ||
           request->frame.rotation.y != tmp.y ||
           request->frame.rotation.z != tmp.z ||
@@ -482,11 +544,8 @@ void URHardwareInterface::handle_set_force_target(
         static_cast<int>(request->type),
         std::vector<double>(request->limits.begin(), request->limits.end()));
     } else {
-      // stop force mode
       response->success = rtde_control_->forceModeStop();
-      if (response->success) {
-        last_motion_ = 0;
-      }
+      if (response->success) last_motion_ = 0;
     }
   } catch (const std::exception & e) {
     RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "set_force_target exception: %s", e.what());
@@ -494,17 +553,21 @@ void URHardwareInterface::handle_set_force_target(
   }
 }
 
+// set_gripper (existing; forwards to Robotiq if available)
 void URHardwareInterface::handle_set_gripper(
   const std::shared_ptr<leitungssatz_interfaces::srv::SetGripper::Request> request,
   std::shared_ptr<leitungssatz_interfaces::srv::SetGripper::Response> response)
 {
   std::lock_guard<std::mutex> lock(rtde_control_mutex_);
   try {
-    // If you have a separate Robotiq node, call it. Here we attempt a minimal behavior.
-    // TODO: integrate Robotiq API as in your ROS1 package
-    (void)request;
-    response->e_object_status = 0;
-    response->success = true;
+    if (gripper_) {
+      // forward to gripper object (it will ensure connection)
+      (void)gripper_->set_gripper(request, response);
+    } else {
+      // stub behavior (as before)
+      response->e_object_status = 0;
+      response->success = true;
+    }
   } catch (const std::exception & e) {
     RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "set_gripper exception: %s", e.what());
     response->success = false;
@@ -512,13 +575,347 @@ void URHardwareInterface::handle_set_gripper(
   }
 }
 
+// store_tf (existing)
 void URHardwareInterface::handle_add_tf2(
   const std::shared_ptr<leitungssatz::srv::AddTf2::Request> request,
   std::shared_ptr<leitungssatz::srv::AddTf2::Response> response)
 {
-  // This can be forwarded to another node or stored; for now accept requests
   (void)request;
   response->success = true;
+}
+
+// ---------------- Newly added handler implementations ----------------
+
+// set_rel_cart_target
+void URHardwareInterface::handle_set_rel_cart_target(
+  const std::shared_ptr<leitungssatz_interfaces::srv::SetRelCartTarget::Request> request,
+  std::shared_ptr<leitungssatz_interfaces::srv::SetRelCartTarget::Response> response)
+{
+  std::lock_guard<std::mutex> lock(rtde_control_mutex_);
+  try {
+    if (!rtde_control_ || !rtde_control_->isConnected() || !rtde_receive_ || !rtde_receive_->isConnected()) {
+      response->success = false;
+      return;
+    }
+
+    // Get current TCP pose from RTDE and convert to Transform
+    auto tcp_vec = rtde_receive_->getActualTCPPose();
+    geometry_msgs::msg::Transform current_tf;
+    if (tcp_vec.size() >= 6) {
+      current_tf.translation.x = tcp_vec[0];
+      current_tf.translation.y = tcp_vec[1];
+      current_tf.translation.z = tcp_vec[2];
+      Eigen::Vector3d rotVec(tcp_vec[3], tcp_vec[4], tcp_vec[5]);
+      double theta = rotVec.norm();
+      Eigen::Quaterniond qrot = Eigen::Quaterniond::Identity();
+      if (theta > 1e-9) {
+        qrot = Eigen::Quaterniond(Eigen::AngleAxisd(theta, rotVec.normalized()));
+      }
+      current_tf.rotation.x = qrot.x();
+      current_tf.rotation.y = qrot.y();
+      current_tf.rotation.z = qrot.z();
+      current_tf.rotation.w = qrot.w();
+    }
+
+    // apply relative translation
+    geometry_msgs::msg::Transform new_tf = current_tf;
+    if (request->rel_goal.size() >= 6) {
+      new_tf.translation.x += request->rel_goal[0];
+      new_tf.translation.y += request->rel_goal[1];
+      new_tf.translation.z += request->rel_goal[2];
+      // relative rotation: build quaternion from small-angle vector
+      Eigen::Quaterniond quat_current;
+      quat_current.w() = current_tf.rotation.w;
+      quat_current.x() = current_tf.rotation.x;
+      quat_current.y() = current_tf.rotation.y;
+      quat_current.z() = current_tf.rotation.z;
+      Eigen::Quaterniond quat_rel = Eigen::AngleAxisd(request->rel_goal[3], Eigen::Vector3d::UnitX())
+                                 * Eigen::AngleAxisd(request->rel_goal[4], Eigen::Vector3d::UnitY())
+                                 * Eigen::AngleAxisd(request->rel_goal[5], Eigen::Vector3d::UnitZ());
+      Eigen::Quaterniond quat_new = quat_current * quat_rel;
+      new_tf.rotation.x = quat_new.x();
+      new_tf.rotation.y = quat_new.y();
+      new_tf.rotation.z = quat_new.z();
+      new_tf.rotation.w = quat_new.w();
+    }
+
+    std::vector<double> pose;
+    transform_to_angelaxis(new_tf, pose);
+
+    if (!rtde_control_->isPoseWithinSafetyLimits(pose)) {
+      RCUTILS_LOG_WARN_NAMED("URHardwareInterface", "Relative target out of safety limits");
+      response->success = false;
+      return;
+    }
+
+    bool success = false;
+    switch (request->mode) {
+      case 1:
+        last_motion_ = 1;
+        success = rtde_control_->moveL(pose, request->speed, request->acceleration, request->asynchronous);
+        break;
+      case 2:
+        last_motion_ = 1;
+        success = rtde_control_->moveJ_IK(pose, request->speed, request->acceleration, request->asynchronous);
+        break;
+      default:
+        success = false;
+        break;
+    }
+
+    response->success = request->asynchronous ? true : success;
+  } catch (const std::exception & e) {
+    RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "set_rel_cart_target exception: %s", e.what());
+    response->success = false;
+  }
+}
+
+// set_joint_target
+void URHardwareInterface::handle_set_joint_target(
+  const std::shared_ptr<leitungssatz_interfaces::srv::SetJointTarget::Request> request,
+  std::shared_ptr<leitungssatz_interfaces::srv::SetJointTarget::Response> response)
+{
+  std::lock_guard<std::mutex> lock(rtde_control_mutex_);
+  try {
+    if (!rtde_control_ || !rtde_control_->isConnected()) {
+      response->success = false;
+      return;
+    }
+
+    std::vector<double> joints(request->joint_goal.begin(), request->joint_goal.end());
+    if (!rtde_control_->isJointsWithinSafetyLimits(joints)) {
+      RCUTILS_LOG_WARN_NAMED("URHardwareInterface", "Joint target out of limits");
+      response->success = false;
+      return;
+    }
+
+    last_motion_ = 2;
+    bool ok = rtde_control_->moveJ(joints, request->speed, request->acceleration, request->asynchronous);
+    response->success = request->asynchronous ? true : ok;
+  } catch (const std::exception & e) {
+    RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "set_joint_target exception: %s", e.what());
+    response->success = false;
+  }
+}
+
+// set_rel_joint_target
+void URHardwareInterface::handle_set_rel_joint_target(
+  const std::shared_ptr<leitungssatz_interfaces::srv::SetJointTarget::Request> request,
+  std::shared_ptr<leitungssatz_interfaces::srv::SetJointTarget::Response> response)
+{
+  std::lock_guard<std::mutex> lock(rtde_control_mutex_);
+  try {
+    if (!rtde_control_ || !rtde_control_->isConnected() || !rtde_receive_ || !rtde_receive_->isConnected()) {
+      response->success = false;
+      return;
+    }
+
+    auto current_q = rtde_receive_->getActualQ();
+    std::vector<double> target(6, 0.0);
+    for (size_t i=0;i<6 && i<current_q.size() && i<request->joint_goal.size(); ++i) {
+      target[i] = current_q[i] + request->joint_goal[i];
+    }
+
+    if (!rtde_control_->isJointsWithinSafetyLimits(target)) {
+      RCUTILS_LOG_WARN_NAMED("URHardwareInterface", "Relative joint target out of limits");
+      response->success = false;
+      return;
+    }
+
+    last_motion_ = 2;
+    bool ok = rtde_control_->moveJ(target, request->speed, request->acceleration, request->asynchronous);
+    response->success = request->asynchronous ? true : ok;
+  } catch (const std::exception & e) {
+    RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "set_rel_joint_target exception: %s", e.what());
+    response->success = false;
+  }
+}
+
+// set_trajectory (Path handling)
+void URHardwareInterface::handle_set_trajectory(
+  const std::shared_ptr<leitungssatz_interfaces::srv::SetTrajectory::Request> request,
+  std::shared_ptr<leitungssatz_interfaces::srv::SetTrajectory::Response> response)
+{
+  std::lock_guard<std::mutex> lock(rtde_control_mutex_);
+  try {
+    // Build ur_rtde Path similar to ROS1
+    ur_rtde::Path path;
+    for (size_t i=0;i<request->path.size(); ++i) {
+      std::vector<double> parameter;
+      // if cartesian goal present (using rotation default check)
+      if (request->path[i].cartesian_goal.rotation.w != 0.0 ||
+          request->path[i].cartesian_goal.rotation.x != 0.0 ||
+          request->path[i].cartesian_goal.rotation.y != 0.0 ||
+          request->path[i].cartesian_goal.rotation.z != 0.0) {
+        geometry_msgs::msg::Transform tf{};
+        tf.translation.x = request->path[i].cartesian_goal.translation.x;
+        tf.translation.y = request->path[i].cartesian_goal.translation.y;
+        tf.translation.z = request->path[i].cartesian_goal.translation.z;
+        tf.rotation = request->path[i].cartesian_goal.rotation;
+        transform_to_angelaxis(tf, parameter);
+      } else {
+        parameter = std::vector<double>(request->path[i].joint_goal.begin(), request->path[i].joint_goal.end());
+      }
+      parameter.push_back(request->path[i].velocity);
+      parameter.push_back(request->path[i].acceleration);
+      parameter.push_back(request->path[i].blend);
+
+      ur_rtde::PathEntry entry(ur_rtde::PathEntry::eMoveType(request->path[i].move_type),
+                              ur_rtde::PathEntry::ePositionType(request->path[i].position_type),
+                              parameter);
+      path.addEntry(entry);
+    }
+
+    // call movePath
+    response->success = rtde_control_->movePath(path, request->asynchronous);
+  } catch (const std::exception & e) {
+    RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "set_trajectory exception: %s", e.what());
+    response->success = false;
+  }
+}
+
+// set_contact_target
+void URHardwareInterface::handle_set_contact_target(
+  const std::shared_ptr<leitungssatz_interfaces::srv::SetContactTarget::Request> request,
+  std::shared_ptr<leitungssatz_interfaces::srv::SetContactTarget::Response> response)
+{
+  std::lock_guard<std::mutex> lock(rtde_control_mutex_);
+  try {
+    response->success = rtde_control_->moveUntilContact(
+      std::vector<double>(request->xd.begin(), request->xd.end()),
+      std::vector<double>(request->direction.begin(), request->direction.end()),
+      request->acceleration);
+  } catch (const std::exception & e) {
+    RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "set_contact_target exception: %s", e.what());
+    response->success = false;
+  }
+}
+
+// log (start/stop file recording)
+void URHardwareInterface::handle_log(
+  const std::shared_ptr<leitungssatz_interfaces::srv::Log::Request> request,
+  std::shared_ptr<leitungssatz_interfaces::srv::Log::Response> response)
+{
+  std::lock_guard<std::mutex> lock(rtde_control_mutex_);
+  try {
+    if (request->io) {
+      if (request->file_name.empty())
+      {
+        RCUTILS_LOG_WARN_NAMED("URHardwareInterface","HW: log filename is missing");
+        response->success = false;
+        return;
+      }
+      response->success = rtde_receive_->startFileRecording(request->file_name + ".csv");
+    } else {
+      response->success = rtde_receive_->stopFileRecording();
+    }
+  } catch (const std::exception & e) {
+    RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "log exception: %s", e.what());
+    response->success = false;
+  }
+}
+
+// zero_ftsensor (trigger)
+void URHardwareInterface::handle_zero_ftsensor(
+  const std::shared_ptr<std_srvs::srv::Trigger::Request> /*request*/,
+  std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+{
+  std::lock_guard<std::mutex> lock(rtde_control_mutex_);
+  try {
+    // wait until steady
+    while (rtde_control_ && !rtde_control_->isSteady()) {
+      std::this_thread::sleep_for(10ms);
+    }
+    if (rtde_control_) {
+      rtde_control_->zeroFtSensor();
+      response->success = true;
+      response->message = "zeroed";
+      return;
+    }
+  } catch (const std::exception & e) {
+    RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "zero_ftsensor exception: %s", e.what());
+  }
+  response->success = false;
+  response->message = "failed";
+}
+
+// set_payload
+void URHardwareInterface::handle_set_payload(
+  const std::shared_ptr<leitungssatz_interfaces::srv::SetPayload::Request> request,
+  std::shared_ptr<leitungssatz_interfaces::srv::SetPayload::Response> response)
+{
+  std::lock_guard<std::mutex> lock(rtde_control_mutex_);
+  try {
+    response->success = rtde_control_->setPayload(request->mass, std::vector<double>(request->cog.begin(), request->cog.end()));
+  } catch (const std::exception & e) {
+    RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "set_payload exception: %s", e.what());
+    response->success = false;
+  }
+}
+
+// get_timestamp
+void URHardwareInterface::handle_get_timestamp(
+  const std::shared_ptr<leitungssatz_interfaces::srv::GetTimeStamp::Request> /*request*/,
+  std::shared_ptr<leitungssatz_interfaces::srv::GetTimeStamp::Response> response)
+{
+  try {
+    if (rtde_receive_) {
+      // note: service field is 'time_stamp' (see GetTimeStamp.srv)
+      response->time_stamp = rtde_receive_->getTimestamp();
+    } else {
+      response->time_stamp = 0.0;
+    }
+  } catch (const std::exception & e) {
+    RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "get_timestamp exception: %s", e.what());
+    response->time_stamp = 0.0;
+  }
+}
+
+// stop_motion
+void URHardwareInterface::handle_stop_motion(
+  const std::shared_ptr<leitungssatz_interfaces::srv::StopMotion::Request> request,
+  std::shared_ptr<leitungssatz_interfaces::srv::StopMotion::Response> response)
+{
+  std::lock_guard<std::mutex> lock(rtde_control_mutex_);
+  try {
+    if (last_motion_ == 2) {
+      rtde_control_->stopJ(request->acceleration);
+      response->success = true;
+    } else if (last_motion_ == 1) {
+      rtde_control_->stopL(request->acceleration);
+      response->success = true;
+    } else {
+      response->success = false;
+    }
+  } catch (const std::exception & e) {
+    RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "stop_motion exception: %s", e.what());
+    response->success = false;
+  }
+}
+
+// set_clip_gun
+void URHardwareInterface::handle_set_clip_gun(
+  const std::shared_ptr<leitungssatz_interfaces::srv::SetClipGun::Request> request,
+  std::shared_ptr<leitungssatz_interfaces::srv::SetClipGun::Response> response)
+{
+  std::lock_guard<std::mutex> lock(rtde_control_mutex_);
+  try {
+    if (!rtde_control_ || !rtde_control_->isConnected()) {
+      response->success = false;
+      return;
+    }
+
+    const int CLIP_GUN_PIN = 4;
+    std::string script = "def set_io():\n"
+                         "  set_standard_digital_out(" + std::to_string(CLIP_GUN_PIN) + ", " +
+                         (request->io ? "True" : "False") + ")\n"
+                         "end\n"
+                         "set_io()\n";
+    response->success = rtde_control_->sendCustomScriptFunction("set_io", script);
+  } catch (const std::exception & e) {
+    RCUTILS_LOG_ERROR_NAMED("URHardwareInterface", "set_clip_gun exception: %s", e.what());
+    response->success = false;
+  }
 }
 
 // jog callback: forward messages to rtde_control_->jogStart / jogStop
@@ -544,7 +941,6 @@ void URHardwareInterface::jog_control_callback(const leitungssatz_interfaces::ms
     } else if (msg->feature == 3) {
       std::vector<double> custom_frame(6, 0.0);
       for (size_t i=0;i<6 && i<msg->custom_frame.size(); ++i) custom_frame[i] = msg->custom_frame[i];
-      // pass acceleration (double) as the 3rd argument, and custom_frame as 4th
       rtde_control_->jogStart(speeds, ur_rtde::RTDEControlInterface::FEATURE_CUSTOM, 0.5, custom_frame);
     } else {
       rtde_control_->jogStop();

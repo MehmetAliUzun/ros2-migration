@@ -3,7 +3,7 @@
   <name>leitungssatz_ros2_driver</name>
   <version>0.1.0</version>
   <description>UR5e RTDE hardware driver and custom interfaces (ros2/humble)</description>
-  <maintainer email="you@example.com">you</maintainer>
+  <maintainer email="mehmet.uzun@study.thws.de">Mehmet Uzun</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
@@ -16,6 +16,7 @@
   <build_depend>realtime_tools</build_depend>
   <build_depend>geometry_msgs</build_depend>
   <build_depend>std_msgs</build_depend>
+  <build_depend>control_msgs</build_depend>
   <build_depend>sensor_msgs</build_depend>
   <build_depend>builtin_interfaces</build_depend>
   <build_depend>ament_index_cpp</build_depend>
@@ -35,6 +36,8 @@
   <exec_depend>tf2_eigen</exec_depend>
   <build_depend>eigen3_cmake_module</build_depend>
   <exec_depend>eigen3_cmake_module</exec_depend>
+  <build_depend>std_srvs</build_depend>
+  <exec_depend>std_srvs</exec_depend>
 
   <!-- Optional UR RTDE C++ binding -->
   <build_depend>ur_rtde</build_depend>

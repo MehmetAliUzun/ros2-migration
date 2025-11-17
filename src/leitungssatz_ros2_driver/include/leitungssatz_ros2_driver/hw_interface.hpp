@@ -16,7 +16,7 @@
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 #include "rcutils/logging_macros.h"
 
-#include <realtime_tools/realtime_buffer.h>
+#include <realtime_tools/realtime_buffer.hpp>
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "geometry_msgs/msg/wrench_stamped.hpp"
@@ -30,8 +30,25 @@
 #include "leitungssatz_interfaces/srv/set_gripper.hpp"
 #include "leitungssatz_interfaces/msg/jog_control.hpp"
 
+// Additional service headers (missing handlers added)
+#include "leitungssatz_interfaces/srv/set_rel_cart_target.hpp"
+#include "leitungssatz_interfaces/srv/set_joint_target.hpp"
+#include "leitungssatz_interfaces/srv/set_trajectory.hpp"
+#include "leitungssatz_interfaces/srv/set_contact_target.hpp"
+#include "leitungssatz_interfaces/srv/log.hpp"
+#include "leitungssatz_interfaces/srv/get_time_stamp.hpp"
+#include "leitungssatz_interfaces/srv/set_payload.hpp"
+#include "leitungssatz_interfaces/srv/stop_motion.hpp"
+#include "leitungssatz_interfaces/srv/set_clip_gun.hpp"
+
+// std_srvs Trigger (required for zero_ftsensor service type)
+#include "std_srvs/srv/trigger.hpp"
+
 #include <ur_rtde/rtde_receive_interface.h>
 #include <ur_rtde/rtde_control_interface.h>
+
+#include "leitungssatz_ros2_driver/dashboard_client.hpp"
+#include "leitungssatz_ros2_driver/robotiq_gripper_interface.hpp"
 
 using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
@@ -82,13 +99,26 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::WrenchStamped>::SharedPtr wrench_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr tcp_info_pub_;
 
-  // Service servers (names match your point_recording)
+  // Service servers (match names used by other nodes)
   rclcpp::Service<leitungssatz_interfaces::srv::SetFreedrive>::SharedPtr srv_set_freedrive_;
   rclcpp::Service<leitungssatz_interfaces::srv::SetCartTarget>::SharedPtr srv_set_cart_target_;
   rclcpp::Service<leitungssatz_interfaces::srv::StartJog>::SharedPtr srv_start_jog_;
   rclcpp::Service<leitungssatz_interfaces::srv::SetForceTarget>::SharedPtr srv_set_force_target_;
   rclcpp::Service<leitungssatz_interfaces::srv::SetGripper>::SharedPtr srv_set_gripper_;
   rclcpp::Service<leitungssatz::srv::AddTf2>::SharedPtr srv_add_tf2_;
+
+  // Newly added service servers (to restore ROS1 parity)
+  rclcpp::Service<leitungssatz_interfaces::srv::SetRelCartTarget>::SharedPtr srv_set_rel_cart_target_;
+  rclcpp::Service<leitungssatz_interfaces::srv::SetJointTarget>::SharedPtr srv_set_joint_target_;
+  rclcpp::Service<leitungssatz_interfaces::srv::SetJointTarget>::SharedPtr srv_set_rel_joint_target_;
+  rclcpp::Service<leitungssatz_interfaces::srv::SetTrajectory>::SharedPtr srv_set_trajectory_;
+  rclcpp::Service<leitungssatz_interfaces::srv::SetContactTarget>::SharedPtr srv_set_contact_target_;
+  rclcpp::Service<leitungssatz_interfaces::srv::Log>::SharedPtr srv_log_;
+  rclcpp::Service<leitungssatz_interfaces::srv::GetTimeStamp>::SharedPtr srv_get_timestamp_;
+  rclcpp::Service<leitungssatz_interfaces::srv::SetPayload>::SharedPtr srv_set_payload_;
+  rclcpp::Service<leitungssatz_interfaces::srv::StopMotion>::SharedPtr srv_stop_motion_;
+  rclcpp::Service<leitungssatz_interfaces::srv::SetClipGun>::SharedPtr srv_set_clip_gun_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr srv_zero_ftsensor_;
 
   // RTDE / UR communication objects (real types)
   std::unique_ptr<ur_rtde::RTDEReceiveInterface> rtde_receive_;
@@ -107,6 +137,14 @@ private:
 
   // Jog subscription (on-demand)
   rclcpp::Subscription<leitungssatz_interfaces::msg::JogControl>::SharedPtr jog_control_sub_;
+
+  // Dashboard & Gripper helpers (ported from ROS1)
+  std::unique_ptr<DashboardClient> dashboard_;
+  std::unique_ptr<RobotiqGripperInterface> gripper_;
+
+  // flags (read from hardware_parameters)
+  bool use_dashboard_{false};
+  bool use_robotiq_{false};
 
   // Convert geometry_msgs::msg::Transform to UR angle-axis vector [x,y,z,rx,ry,rz]
   void transform_to_angelaxis(const geometry_msgs::msg::Transform & transform, std::vector<double>& angleaxis);
@@ -135,6 +173,51 @@ private:
   void handle_add_tf2(
     const std::shared_ptr<leitungssatz::srv::AddTf2::Request> request,
     std::shared_ptr<leitungssatz::srv::AddTf2::Response> response);
+
+  // Newly added handlers
+  void handle_set_rel_cart_target(
+    const std::shared_ptr<leitungssatz_interfaces::srv::SetRelCartTarget::Request> request,
+    std::shared_ptr<leitungssatz_interfaces::srv::SetRelCartTarget::Response> response);
+
+  void handle_set_joint_target(
+    const std::shared_ptr<leitungssatz_interfaces::srv::SetJointTarget::Request> request,
+    std::shared_ptr<leitungssatz_interfaces::srv::SetJointTarget::Response> response);
+
+  void handle_set_rel_joint_target(
+    const std::shared_ptr<leitungssatz_interfaces::srv::SetJointTarget::Request> request,
+    std::shared_ptr<leitungssatz_interfaces::srv::SetJointTarget::Response> response);
+
+  void handle_set_trajectory(
+    const std::shared_ptr<leitungssatz_interfaces::srv::SetTrajectory::Request> request,
+    std::shared_ptr<leitungssatz_interfaces::srv::SetTrajectory::Response> response);
+
+  void handle_set_contact_target(
+    const std::shared_ptr<leitungssatz_interfaces::srv::SetContactTarget::Request> request,
+    std::shared_ptr<leitungssatz_interfaces::srv::SetContactTarget::Response> response);
+
+  void handle_log(
+    const std::shared_ptr<leitungssatz_interfaces::srv::Log::Request> request,
+    std::shared_ptr<leitungssatz_interfaces::srv::Log::Response> response);
+
+  void handle_zero_ftsensor(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+
+  void handle_set_payload(
+    const std::shared_ptr<leitungssatz_interfaces::srv::SetPayload::Request> request,
+    std::shared_ptr<leitungssatz_interfaces::srv::SetPayload::Response> response);
+
+  void handle_get_timestamp(
+    const std::shared_ptr<leitungssatz_interfaces::srv::GetTimeStamp::Request> request,
+    std::shared_ptr<leitungssatz_interfaces::srv::GetTimeStamp::Response> response);
+
+  void handle_stop_motion(
+    const std::shared_ptr<leitungssatz_interfaces::srv::StopMotion::Request> request,
+    std::shared_ptr<leitungssatz_interfaces::srv::StopMotion::Response> response);
+
+  void handle_set_clip_gun(
+    const std::shared_ptr<leitungssatz_interfaces::srv::SetClipGun::Request> request,
+    std::shared_ptr<leitungssatz_interfaces::srv::SetClipGun::Response> response);
 
   // jog callback
   void jog_control_callback(const leitungssatz_interfaces::msg::JogControl::SharedPtr msg);

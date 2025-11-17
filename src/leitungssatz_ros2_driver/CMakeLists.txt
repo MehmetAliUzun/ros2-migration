@@ -20,8 +20,10 @@ find_package(realtime_tools REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(ament_index_cpp REQUIRED)
+find_package(control_msgs REQUIRED)
 
 find_package(tf2 REQUIRED)
 find_package(tf2_eigen REQUIRED)
@@ -68,6 +70,7 @@ if(ENABLE_UR_RTDE AND ur_rtde_FOUND)
     geometry_msgs
     std_msgs
     sensor_msgs
+    std_srvs
     ament_index_cpp
     ur_rtde
     leitungssatz_interfaces
@@ -87,6 +90,7 @@ else()
     std_msgs
     sensor_msgs
     ament_index_cpp
+    std_srvs
     leitungssatz_interfaces
     leitungssatz
     tf2
@@ -98,6 +102,48 @@ install(TARGETS ur_hardware_interface
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
+)
+
+add_library(ur_hardware_interface_sim SHARED
+  src/hw_interface_sim.cpp
+)
+ament_target_dependencies(ur_hardware_interface_sim
+  rclcpp
+  rclcpp_lifecycle
+  rclcpp_action
+  hardware_interface
+  controller_manager
+  control_msgs
+  trajectory_msgs
+  leitungssatz_interfaces
+  pluginlib
+)
+
+if (TARGET leitungssatz_interfaces__rosidl_generator_cpp)
+  add_dependencies(ur_hardware_interface_sim leitungssatz_interfaces__rosidl_generator_cpp)
+endif()
+
+install(TARGETS ur_hardware_interface_sim
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+# Add sim service bridge executable
+add_executable(sim_service_bridge src/sim_service_bridge.cpp)
+ament_target_dependencies(sim_service_bridge
+  rclcpp
+  rclcpp_action
+  control_msgs
+  trajectory_msgs
+  sensor_msgs
+  leitungssatz_interfaces
+)
+
+install(TARGETS
+  ur_hardware_interface
+  sim_service_bridge
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 # optional: install plugin xml if you have one

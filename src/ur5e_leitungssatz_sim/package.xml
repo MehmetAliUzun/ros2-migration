@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>ur5e_leitungssatz_sim</name>
+  <version>0.1.0</version>
+  <description>UR5e Gazebo simulation with Robotiq gripper for leitungssatz project</description>
+  <maintainer email="mehmet.uzun@study.thws.de">Mehmet Uzun</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Core ROS2 dependencies -->
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  
+  <!-- URDF/xacro -->
+  <depend>xacro</depend>
+  <depend>urdf</depend>
+  
+  <!-- Gazebo simulation -->
+  <depend>gazebo_ros</depend>
+  <depend>gazebo_ros2_control</depend>
+  
+  <!-- Robot state/joint publishers -->
+  <depend>robot_state_publisher</depend>
+  <exec_depend>joint_state_publisher</exec_depend>
+  
+  <!-- ros2_control framework -->
+  <depend>controller_manager</depend>
+  <depend>ros2_control</depend>
+  <depend>ros2_controllers</depend>
+  
+  <!-- Specific controllers -->
+  <depend>joint_trajectory_controller</depend>
+  <depend>joint_state_broadcaster</depend>
+  <depend>position_controllers</depend>
+  
+  <!-- Your custom packages -->
+  <depend>leitungssatz_interfaces</depend>
+  <depend>leitungssatz_ros2_driver</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <!-- Remove hardcoded paths - Gazebo will find models via ROS2 package mechanism -->
+  </export>
+</package>
