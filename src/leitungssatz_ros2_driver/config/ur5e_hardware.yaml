@@ -1,0 +1,29 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 125  
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+      # joints:
+      #   - shoulder_pan_joint
+      #   - shoulder_lift_joint
+      #   - elbow_joint
+      #   - wrist_1_joint
+      #   - wrist_2_joint
+      #   - wrist_3_joint
+
+# Parameters for hardware interface plugin
+ur_hardware_interface:
+  ros__parameters:
+    # These are read in URHardwareInterface::on_init from info_.hardware_parameters
+    robot_ip: "172.31.1.200"
+    use_dashboard: true
+    use_robotiq: true
+
+    # The 'hardware' key is used if this is embedded in URDF.
+    # If you configure hardware directly on ros2_control_node, you may place
+    # this under controller_manager or in a separate YAML. For URDF usage,
+    # a typical snippet inside <ros2_control> would refer to the plugin:
+    #   <hardware>
+    #     <plugin>leitungssatz_interfaces/URHardwareInterface</plugin>
+    #   </hardware>

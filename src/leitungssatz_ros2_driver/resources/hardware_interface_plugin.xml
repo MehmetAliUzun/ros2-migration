@@ -1,4 +1,4 @@
-cat > ~/Desktop/ls_ros2/src/leitungssatz_ros2_driver/resources/hardware_interface_plugin.xml <<'XML'
+
 <?xml version="1.0"?>
 <library path="lib/libur_hardware_interface.so">
   <!-- Real robot hardware plugin -->
